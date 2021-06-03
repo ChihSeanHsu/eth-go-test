@@ -1,0 +1,35 @@
+version: '3'
+services:
+  app:
+    build:
+      context:  ../
+      dockerfile: Dockerfile
+    networks:
+      - example
+    ports:
+      - 8080:8080
+    depends_on:
+      - db
+
+  db:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: db
+    volumes:
+      - ./db:/var/lib/postgresql/data
+    networks:
+      - example
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 18080:8080
+    networks:
+      - example
+
+networks:
+  example:
+    driver: bridge
