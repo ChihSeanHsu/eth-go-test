@@ -4,8 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/eth-go-test/pkg/models"
 	"github.com/ethereum/go-ethereum"
-	//"github.com/ethereum/go-ethereum/rpc"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"log"
@@ -18,6 +18,8 @@ const (
 	EtheUrlHttp      = "https://data-seed-prebsc-2-s3.binance.org:8545/"
 	EtheUrlWebSocket = "wss://bsc-ws-node.nariox.org:443"
 )
+
+var DB *models.DB
 
 type retryCount struct {
 	BlockNum *big.Int
@@ -65,6 +67,7 @@ func worker(id int, jobs <-chan *big.Int, rescues chan retryCount) {
 	for blockNum := range jobs {
 		if block, err := ethClient.BlockByNumber(ctx, blockNum); err == nil {
 			// TODO: store to db
+			DB.CreateBlock(ctx, ethClient, block)
 			fmt.Printf("worker%d block: %s, %s\n", id, block.Hash(), block.Number())
 		} else if err.Error() == "not found" {
 			rescues <- retryCount{blockNum, 1}
@@ -85,6 +88,7 @@ func rescuer(id int, rescues <-chan retryCount, rescuesQueue chan retryCount) {
 		if block, err := ethClient.BlockByNumber(ctx, retry.BlockNum); err == nil {
 			// TODO: store to db
 			time.Sleep(time.Duration(retry.Retry) * time.Second)
+			DB.CreateBlock(ctx, ethClient, block)
 			fmt.Printf("rescuer%d block: %s, %s\n", id, block.Hash(), block.Number())
 		} else if err.Error() == "not found" && retry.Retry <= 3 {
 			retry.Retry++
@@ -103,6 +107,8 @@ func main() {
 	wsMode := flag.Bool("ws", false, "How many workers")
 	flag.Parse()
 
+	dsn := "host=db user=postgres password=example dbname=db port=5432 sslmode=disable TimeZone=Asia/Taipei"
+	DB = models.InitDB(dsn, 20)
 	jobs := make(chan *big.Int)
 	rescues := make(chan retryCount)
 	connStr := EtheUrlHttp
