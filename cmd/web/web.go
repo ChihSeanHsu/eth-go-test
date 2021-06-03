@@ -1,18 +1,16 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
+	"log"
 	"math/big"
 	"net/http"
 	"strconv"
-)
-import (
-	"context"
-	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"log"
 )
 
 var EthClient *ethclient.Client
@@ -21,12 +19,11 @@ const (
 	EtheUrl = "https://data-seed-prebsc-2-s3.binance.org:8545/"
 )
 
-
-func addBlock(block *ethTypes.Block, result *[]gin.H)  {
+func addBlock(block *ethTypes.Block, result *[]gin.H) {
 	*result = append(*result, gin.H{
-		"block_num": block.Number(),
-		"block_hash": block.Hash(),
-		"block_time": block.Time(),
+		"block_num":   block.Number(),
+		"block_hash":  block.Hash(),
+		"block_time":  block.Time(),
 		"parent_hash": block.ParentHash(),
 	})
 }
@@ -88,10 +85,10 @@ func getBlockByID(c *gin.Context) {
 		transactions = append(transactions, tx.Hash())
 	}
 	c.JSON(200, gin.H{
-		"block_num": block.Number(),
-		"block_hash": block.Hash(),
-		"block_time": block.Time(),
-		"parent_hash": block.ParentHash(),
+		"block_num":    block.Number(),
+		"block_hash":   block.Hash(),
+		"block_time":   block.Time(),
+		"parent_hash":  block.ParentHash(),
 		"transactions": transactions,
 	})
 }
@@ -124,12 +121,12 @@ func getTxByHash(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{
 		"tx_hash": tx.Hash(),
-		"to": tx.To(),
-		"from": from,
-		"nonce": tx.Nonce(),
-		"data": tx.Data(),
-		"value": tx.Value(),
-		"logs": receipt.Logs,
+		"to":      tx.To(),
+		"from":    from,
+		"nonce":   tx.Nonce(),
+		"data":    tx.Data(),
+		"value":   tx.Value(),
+		"logs":    receipt.Logs,
 	})
 }
 
