@@ -8,12 +8,11 @@ WORKDIR /app
 COPY . /app
 RUN make all
 
-# Final stage
+# Final stage WEB
 FROM alpine
 WORKDIR /app
 RUN apk --no-cache add curl
 RUN apk --no-cache upgrade
 COPY --from=BUILD-STAGE /app/output/ /app/
 COPY --from=BUILD-STAGE /app/entrypoint.sh /app/entrypoint.sh
-
-ENTRYPOINT ["/app/entrypoint.sh", "/app/web"]
+ENTRYPOINT ["/app/entrypoint.sh"]
