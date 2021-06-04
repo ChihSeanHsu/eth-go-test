@@ -13,6 +13,8 @@ services:
       - db
     command:
       - /app/web
+    environment:
+      DB_CONN_STR: "host=db user=postgres password=example dbname=db port=5432 sslmode=disable TimeZone=Asia/Taipei"
 
   db:
     image: postgres:13

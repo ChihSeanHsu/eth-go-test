@@ -104,8 +104,7 @@ func main() {
 	wsMode := flag.Bool("ws", false, "How many workers")
 	flag.Parse()
 
-	dsn := "host=db user=postgres password=example dbname=db port=5432 sslmode=disable TimeZone=Asia/Taipei"
-	DB = models.InitDB(dsn, 20, 1)
+	DB = models.InitDB(20, 1)
 	jobs := make(chan *big.Int)
 	rescues := make(chan retryCount)
 	connStr := EtheUrlHttp

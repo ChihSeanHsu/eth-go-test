@@ -8,6 +8,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
+	"os"
 	"time"
 )
 
@@ -15,7 +16,8 @@ type DB struct {
 	*gorm.DB
 }
 
-func InitDB(dsn string, pool int, retry int) *DB {
+func InitDB(pool int, retry int) *DB {
+	dsn := os.Getenv("DB_CONN_STR")
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil && retry <= 3 {
 		log.Println(err)
@@ -24,7 +26,7 @@ func InitDB(dsn string, pool int, retry int) *DB {
 		retry++
 		log.Println("wait for reconnect...")
 		time.Sleep(time.Duration(waitSec) * time.Second)
-		return InitDB(dsn, pool, retry)
+		return InitDB(pool, retry)
 	} else if err != nil {
 		log.Fatal(err)
 	}

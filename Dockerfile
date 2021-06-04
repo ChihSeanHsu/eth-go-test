@@ -15,4 +15,3 @@ RUN apk --no-cache add curl
 RUN apk --no-cache upgrade
 COPY --from=BUILD-STAGE /app/output/ /app/
 COPY --from=BUILD-STAGE /app/entrypoint.sh /app/entrypoint.sh
-ENTRYPOINT ["/app/entrypoint.sh"]

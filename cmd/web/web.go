@@ -107,8 +107,7 @@ func getTxByHash(c *gin.Context) {
 }
 
 func main() {
-	dsn := "host=db user=postgres password=example dbname=db port=5432 sslmode=disable TimeZone=Asia/Taipei"
-	DB = models.InitDB(dsn, 20, 1)
+	DB = models.InitDB(20, 1)
 	r := gin.Default()
 	r.GET("/blocks", getBlocks)
 	r.GET("/blocks/:id", getBlockByID)
