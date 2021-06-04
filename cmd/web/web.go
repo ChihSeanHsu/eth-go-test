@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/eth-go-test/pkg/models"
 	"github.com/gin-gonic/gin"
@@ -31,19 +32,24 @@ func getBlocks(c *gin.Context) {
 	}
 	ctx := context.Background()
 	// TODO: error handling
-	blocks := DB.GetBlocks(ctx, int(limit))
-
-	for _, block := range blocks {
-		result = append(result, gin.H{
-			"block_num":   block.BlockNum,
-			"block_hash":  block.BlockHash,
-			"block_time":  block.BlockTime,
-			"parent_hash": block.ParentHash,
+	blocks, err := DB.GetBlocks(ctx, int(limit))
+	if errors.Is(err, models.ErrNotFound) {
+		c.AbortWithError(http.StatusNotFound, err)
+	} else if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	} else {
+		for _, block := range blocks {
+			result = append(result, gin.H{
+				"block_num":   block.BlockNum,
+				"block_hash":  block.BlockHash,
+				"block_time":  block.BlockTime,
+				"parent_hash": block.ParentHash,
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"blocks": result,
 		})
 	}
-	c.JSON(200, gin.H{
-		"blocks": result,
-	})
 }
 
 func getBlockByID(c *gin.Context) {
@@ -51,17 +57,23 @@ func getBlockByID(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	ctx := context.Background()
 	// TODO: error handling
-	block := DB.GetBlockByID(ctx, id)
-	for _, tx := range block.Transactions {
-		txs = append(txs, tx.TransactionHash)
+	block, err := DB.GetBlockByID(ctx, id)
+	if errors.Is(err, models.ErrNotFound) {
+		c.AbortWithError(http.StatusNotFound, err)
+	} else if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	} else {
+		for _, tx := range block.Transactions {
+			txs = append(txs, tx.TransactionHash)
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"block_num":    block.BlockNum,
+			"block_hash":   block.BlockHash,
+			"block_time":   block.BlockTime,
+			"parent_hash":  block.ParentHash,
+			"transactions": txs,
+		})
 	}
-	c.JSON(200, gin.H{
-		"block_num":    block.BlockNum,
-		"block_hash":   block.BlockHash,
-		"block_time":   block.BlockTime,
-		"parent_hash":  block.ParentHash,
-		"transactions": txs,
-	})
 }
 
 func getTxByHash(c *gin.Context) {
@@ -69,28 +81,34 @@ func getTxByHash(c *gin.Context) {
 	hash := c.Param("txHash")
 	ctx := context.Background()
 	// TODO: add error handling
-	tx := DB.GetTxByHash(ctx, hash)
-	for _, log := range tx.Logs {
-		logs = append(logs, gin.H{
-			"index": log.Index,
-			"data":  log.Data,
+	tx, err := DB.GetTxByHash(ctx, hash)
+	if errors.Is(err, models.ErrNotFound) {
+		c.AbortWithError(http.StatusNotFound, err)
+	} else if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	} else {
+		for _, log := range tx.Logs {
+			logs = append(logs, gin.H{
+				"index": log.Index,
+				"data":  log.Data,
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"tx_hash": tx.TransactionHash,
+			"to":      tx.To,
+			"from":    tx.From,
+			"nonce":   tx.Nonce,
+			"data":    tx.Data,
+			"value":   tx.Value,
+			"logs":    logs,
 		})
 	}
-
-	c.JSON(200, gin.H{
-		"tx_hash": tx.TransactionHash,
-		"to":      tx.To,
-		"from":    tx.From,
-		"nonce":   tx.Nonce,
-		"data":    tx.Data,
-		"value":   tx.Value,
-		"logs":    logs,
-	})
 }
 
 func main() {
 	dsn := "host=db user=postgres password=example dbname=db port=5432 sslmode=disable TimeZone=Asia/Taipei"
-	DB = models.InitDB(dsn, 20)
+	DB = models.InitDB(dsn, 20, 1)
 	r := gin.Default()
 	r.GET("/blocks", getBlocks)
 	r.GET("/blocks/:id", getBlockByID)

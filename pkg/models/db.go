@@ -2,12 +2,11 @@ package models
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"log"
 	"time"
 )
@@ -16,9 +15,17 @@ type DB struct {
 	*gorm.DB
 }
 
-func InitDB(dsn string, pool int) *DB {
+func InitDB(dsn string, pool int, retry int) *DB {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
+	if err != nil && retry <= 3 {
+		log.Println(err)
+		// waiting for return
+		waitSec := 60 * retry
+		retry++
+		log.Println("wait for reconnect...")
+		time.Sleep(time.Duration(waitSec) * time.Second)
+		return InitDB(dsn, pool, retry)
+	} else if err != nil {
 		log.Fatal(err)
 	}
 	sqlDB, _ := db.DB()
@@ -34,17 +41,17 @@ func (db *DB) CreateBlock(ctx context.Context, ethClient *ethclient.Client, bloc
 		var logs []Log
 		chainID, err := ethClient.NetworkID(ctx)
 		if err != nil {
-			fmt.Printf("Get chainID err: %s", err)
+			log.Printf("Get chainID err: %s", err)
 		}
 
 		receipt, err := ethClient.TransactionReceipt(ctx, tx.Hash())
 		if err != nil {
-			fmt.Printf("Get receipt err: %s", err)
+			log.Printf("Get receipt err: %s", err)
 		}
-		for _, log := range receipt.Logs {
+		for _, l := range receipt.Logs {
 			logs = append(logs, Log{
-				Index: log.Index,
-				Data:  log.Data,
+				Index: l.Index,
+				Data:  l.Data,
 			})
 		}
 		txModel := Transaction{
@@ -71,22 +78,37 @@ func (db *DB) CreateBlock(ctx context.Context, ethClient *ethclient.Client, bloc
 	})
 }
 
-func (db *DB) GetBlocks(ctx context.Context, limit int) []Block {
+func (db *DB) GetBlocks(ctx context.Context, limit int) ([]Block, error) {
 	var blocks []Block
-	db.Order("block_num desc").Limit(limit).Find(&blocks)
-	return blocks
+	err := db.Order("block_num desc").Limit(limit).Find(&blocks).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return blocks, ErrNotFound
+	} else if err != nil {
+		return blocks, err
+	}
+	return blocks, nil
 }
 
-func (db *DB) GetBlockByID(ctx context.Context, id uint64) Block {
+func (db *DB) GetBlockByID(ctx context.Context, id uint64) (Block, error) {
 	var block Block
-	db.Preload("Transactions.TransactionHash").Preload(clause.Associations).
-		First(&block, "blocks.block_num = ?", id)
-	return block
+	err := db.Where("blocks.block_num = ?", id).Preload("Transactions").First(&block).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return block, ErrNotFound
+	} else if err != nil {
+		return block, err
+	}
+	return block, nil
 }
 
-func (db *DB) GetTxByHash(ctx context.Context, hash string) Transaction {
+func (db *DB) GetTxByHash(ctx context.Context, hash string) (Transaction, error) {
 	var tx Transaction
-	db.Preload("Logs.Index Logs.Data").Preload(clause.Associations).
-		First(&tx, "transactions.transaction_hash = ?", hash)
-	return tx
+	err := db.Where("transactions.transaction_hash = ?", hash).Preload("Logs").
+		First(&tx).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return tx, ErrNotFound
+	} else if err != nil {
+		return tx, err
+	}
+	return tx, nil
 }

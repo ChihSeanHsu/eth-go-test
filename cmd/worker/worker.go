@@ -32,7 +32,7 @@ func subNewBlock(sub ethereum.Subscription, headers <-chan *ethTypes.Header, job
 		case err := <-sub.Err():
 			fmt.Errorf("%s", err)
 		case header := <-headers:
-			fmt.Println("sub insert ", header.Number)
+			log.Println("sub insert ", header.Number)
 			jobs <- header.Number
 		}
 	}
@@ -44,13 +44,13 @@ func forLoopCheckNewBlock(client *ethclient.Client, jobs chan *big.Int, end big.
 	for {
 		header, err := client.HeaderByNumber(ctx, nil)
 		if err != nil {
-			fmt.Println("get header err: ", err)
+			log.Println("get header err: ", err)
 		}
 		if header.Number.Cmp(&end) != 0 {
 			one := big.NewInt(1)
 			for i = &end; header.Number.Cmp(i) != 0; i.Add(i, one) {
 				jobs <- big.NewInt(i.Int64())
-				fmt.Println("loop insert ", i)
+				log.Println("loop insert ", i)
 			}
 			end = *header.Number
 		}
@@ -66,14 +66,12 @@ func worker(id int, jobs <-chan *big.Int, rescues chan retryCount) {
 	ctx := context.Background()
 	for blockNum := range jobs {
 		if block, err := ethClient.BlockByNumber(ctx, blockNum); err == nil {
-			// TODO: store to db
 			DB.CreateBlock(ctx, ethClient, block)
-			fmt.Printf("worker%d block: %s, %s\n", id, block.Hash(), block.Number())
+			log.Printf("worker%d block: %s, %s\n", id, block.Hash(), block.Number())
 		} else if err.Error() == "not found" {
 			rescues <- retryCount{blockNum, 1}
 		} else {
-			fmt.Printf("worker%d, block: %v, %v\n", id, blockNum, err)
-
+			log.Printf("worker%d, block: %v, %v\n", id, blockNum, err)
 		}
 	}
 }
@@ -86,15 +84,14 @@ func rescuer(id int, rescues <-chan retryCount, rescuesQueue chan retryCount) {
 	ctx := context.Background()
 	for retry := range rescues {
 		if block, err := ethClient.BlockByNumber(ctx, retry.BlockNum); err == nil {
-			// TODO: store to db
 			time.Sleep(time.Duration(retry.Retry) * time.Second)
 			DB.CreateBlock(ctx, ethClient, block)
-			fmt.Printf("rescuer%d block: %s, %s\n", id, block.Hash(), block.Number())
+			log.Printf("rescuer%d block: %s, %s\n", id, block.Hash(), block.Number())
 		} else if err.Error() == "not found" && retry.Retry <= 3 {
 			retry.Retry++
 			rescuesQueue <- retry
 		} else {
-			fmt.Printf("rescuer%d, %v, %v\n", id, retry.BlockNum, err)
+			log.Printf("rescuer%d, %v, %v\n", id, retry.BlockNum, err)
 		}
 	}
 }
@@ -108,7 +105,7 @@ func main() {
 	flag.Parse()
 
 	dsn := "host=db user=postgres password=example dbname=db port=5432 sslmode=disable TimeZone=Asia/Taipei"
-	DB = models.InitDB(dsn, 20)
+	DB = models.InitDB(dsn, 20, 1)
 	jobs := make(chan *big.Int)
 	rescues := make(chan retryCount)
 	connStr := EtheUrlHttp
