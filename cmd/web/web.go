@@ -16,7 +16,8 @@ var (
 
 func getBlocks(c *gin.Context) {
 	var limit, defaultLimit uint64
-	var result []gin.H
+	var result gin.H
+	var status int
 
 	defaultLimit = 10
 	limitString := c.Query("limit")
@@ -34,58 +35,80 @@ func getBlocks(c *gin.Context) {
 	// TODO: error handling
 	blocks, err := DB.GetBlocks(ctx, int(limit))
 	if errors.Is(err, models.ErrNotFound) {
-		c.AbortWithError(http.StatusNotFound, err)
+		status = http.StatusNotFound
+		result = gin.H{
+			"err": err,
+		}
+
 	} else if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		status = http.StatusInternalServerError
+		result = gin.H{
+			"err": err,
+		}
 	} else {
+		var array []gin.H
 		for _, block := range blocks {
-			result = append(result, gin.H{
+			array = append(array, gin.H{
 				"block_num":   block.BlockNum,
 				"block_hash":  block.BlockHash,
 				"block_time":  block.BlockTime,
 				"parent_hash": block.ParentHash,
 			})
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"blocks": result,
-		})
+		status = http.StatusOK
+		result = gin.H{
+			"block": array,
+		}
 	}
+	c.JSON(status, result)
 }
 
 func getBlockByID(c *gin.Context) {
 	var txs []string
+	var result gin.H
+	var status int
+
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	ctx := context.Background()
 	// TODO: error handling
 	block, err := DB.GetBlockByID(ctx, id)
 	if errors.Is(err, models.ErrNotFound) {
-		c.AbortWithError(http.StatusNotFound, err)
+		result = gin.H{"err": err.Error()}
+		status = http.StatusNotFound
 	} else if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		result = gin.H{"err": err.Error()}
+		status = http.StatusInternalServerError
 	} else {
 		for _, tx := range block.Transactions {
 			txs = append(txs, tx.TransactionHash)
 		}
-		c.JSON(http.StatusOK, gin.H{
+		result = gin.H{
 			"block_num":    block.BlockNum,
 			"block_hash":   block.BlockHash,
 			"block_time":   block.BlockTime,
 			"parent_hash":  block.ParentHash,
 			"transactions": txs,
-		})
+		}
+		status = http.StatusOK
 	}
+	c.JSON(status, result)
 }
 
 func getTxByHash(c *gin.Context) {
 	var logs []gin.H
+	var result gin.H
+	var status int
+
 	hash := c.Param("txHash")
 	ctx := context.Background()
 	// TODO: add error handling
 	tx, err := DB.GetTxByHash(ctx, hash)
 	if errors.Is(err, models.ErrNotFound) {
-		c.AbortWithError(http.StatusNotFound, err)
+		result = gin.H{"err": err.Error()}
+		status = http.StatusNotFound
 	} else if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		result = gin.H{"err": err.Error()}
+		status = http.StatusInternalServerError
 	} else {
 		for _, log := range tx.Logs {
 			logs = append(logs, gin.H{
@@ -93,8 +116,7 @@ func getTxByHash(c *gin.Context) {
 				"data":  log.Data,
 			})
 		}
-
-		c.JSON(http.StatusOK, gin.H{
+		result = gin.H{
 			"tx_hash": tx.TransactionHash,
 			"to":      tx.To,
 			"from":    tx.From,
@@ -102,8 +124,11 @@ func getTxByHash(c *gin.Context) {
 			"data":    tx.Data,
 			"value":   tx.Value,
 			"logs":    logs,
-		})
+		}
+		status = http.StatusOK
+
 	}
+	c.JSON(status, result)
 }
 
 func main() {

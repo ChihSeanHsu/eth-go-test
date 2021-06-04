@@ -22,7 +22,7 @@ func InitDB(pool int, retry int) *DB {
 	if err != nil && retry <= 3 {
 		log.Println(err)
 		// waiting for return
-		waitSec := 60 * retry
+		waitSec := 10 * retry
 		retry++
 		log.Println("wait for reconnect...")
 		time.Sleep(time.Duration(waitSec) * time.Second)
