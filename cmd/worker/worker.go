@@ -14,12 +14,10 @@ import (
 	"time"
 )
 
-const (
-	EtheUrlHttp      = "https://data-seed-prebsc-2-s3.binance.org:8545/"
-	EtheUrlWebSocket = "wss://bsc-ws-node.nariox.org:443"
+var (
+	DB   *models.DB
+	FQDN string
 )
-
-var DB *models.DB
 
 type retryCount struct {
 	BlockNum *big.Int
@@ -59,7 +57,7 @@ func forLoopCheckNewBlock(client *ethclient.Client, jobs chan *big.Int, end big.
 }
 
 func worker(id int, jobs <-chan *big.Int, rescues chan retryCount) {
-	ethClient, err := ethclient.Dial(EtheUrlHttp)
+	ethClient, err := ethclient.Dial(FQDN)
 	if err != nil {
 		log.Fatal("worker", id, "err", err)
 	}
@@ -77,7 +75,7 @@ func worker(id int, jobs <-chan *big.Int, rescues chan retryCount) {
 }
 
 func rescuer(id int, rescues <-chan retryCount, rescuesQueue chan retryCount) {
-	ethClient, err := ethclient.Dial(EtheUrlHttp)
+	ethClient, err := ethclient.Dial(FQDN)
 	if err != nil {
 		log.Fatal("rescuer", id, "err", err)
 	}
@@ -102,16 +100,14 @@ func main() {
 	startFrom := flag.Int64("start", -1, "start from which block index")
 	workerNum := flag.Int("worker", 5, "How many workers")
 	wsMode := flag.Bool("ws", false, "How many workers")
+	flag.StringVar(&FQDN, "fqdn", "https://data-seed-prebsc-2-s3.binance.org:8545/", "eth fqdn")
+
 	flag.Parse()
 
 	DB = models.InitDB(20, 1)
 	jobs := make(chan *big.Int)
 	rescues := make(chan retryCount)
-	connStr := EtheUrlHttp
-	if *wsMode {
-		connStr = EtheUrlWebSocket
-	}
-	client, err := ethclient.Dial(connStr)
+	client, err := ethclient.Dial(FQDN)
 	if err != nil {
 		log.Fatal("connect err: ", err)
 	}
