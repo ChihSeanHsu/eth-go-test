@@ -83,12 +83,10 @@ func (db *DB) CreateBlock(ctx context.Context, ethClient *ethclient.Client, bloc
 func (db *DB) GetBlocks(ctx context.Context, limit int) ([]Block, error) {
 	var blocks []Block
 	err := db.Order("block_num desc").Limit(limit).Find(&blocks).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if len(blocks) == 0 {
 		return blocks, ErrNotFound
-	} else if err != nil {
-		return blocks, err
 	}
-	return blocks, nil
+	return blocks, err
 }
 
 func (db *DB) GetBlockByID(ctx context.Context, id uint64) (Block, error) {
@@ -96,21 +94,16 @@ func (db *DB) GetBlockByID(ctx context.Context, id uint64) (Block, error) {
 	err := db.Where("blocks.block_num = ?", id).Preload("Transactions").First(&block).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return block, ErrNotFound
-	} else if err != nil {
-		return block, err
 	}
-	return block, nil
+	return block, err
 }
 
 func (db *DB) GetTxByHash(ctx context.Context, hash string) (Transaction, error) {
 	var tx Transaction
 	err := db.Where("transactions.transaction_hash = ?", hash).Preload("Logs").
 		First(&tx).Error
-
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return tx, ErrNotFound
-	} else if err != nil {
-		return tx, err
 	}
-	return tx, nil
+	return tx, err
 }
